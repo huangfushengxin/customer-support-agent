@@ -19,17 +19,11 @@
 
 
 | 入口 | 命令 | 用途 |
-
 |---|---|---|
-
 | 完整 Agent | `uv run python agent_persistent.py` | 多轮对话、确认、恢复、日志 |
-
 | 离线演示 | `uv run python demo_agent_memory.py` | 模拟模型，验证记忆和恢复 |
-
 | 网页 | `uv run uvicorn ticket_api:app --reload` | 完整多轮 Agent、会话恢复、确认建单及工单管理 |
-
 | 全部测试 | `uv run python -m unittest discover -s . -p 'test_*.py' -v` | 使用模拟模型和临时数据库 |
-
 | 检索评测 | `uv run python evaluate_knowledge.py` | 检查固定问题的 FAQ 检索 |
 
 
@@ -469,29 +463,17 @@ uv run python agent_persistent.py
 
 
 | 字段 | 含义 |
-
 |---|---|
-
 | time | 带时区的本机时间 |
-
 | event_id | 本次操作编号 |
-
 | thread_id | 会话编号 |
-
 | operation | turn 对话、confirm 确认 |
-
 | outcome | success 成功、error 失败 |
-
 | duration_ms | 整次操作耗时，单位毫秒，包含模型、工具和检查点操作 |
-
 | status | 成功对话的业务状态，例如 need_info、draft_ready |
-
 | flow_nodes / tools | 成功对话执行的节点、工具名称 |
-
 | ticket_id / already_saved | 确认返回的工单编号、是否已保存 |
-
 | error_type / http_status | 错误类别；模型 HTTP 错误还包含状态码 |
-
 | ticket_committed | 工单已提交但检查点更新失败时为 true，可用原命令重试 |
 
 
@@ -572,7 +554,7 @@ docker compose up -d
 
 
 
-本机与 Linux 容器内均通过 84 项离线测试；镜像构建、网页健康检查、工单跨容器重建持久化和离线会话跨临时容器恢复已实际验证。容器中的真实模型联网问答尚未验收。
+Docker 初次验收时通过 84 项离线测试；新增网页 Agent 后，Linux 断网临时容器内共 96 项通过。镜像构建、健康检查、工单与会话跨容器重建恢复已实际验证。最新真实网页操作记录见 [验收记录](验收记录.md)。
 
 ### 多轮回复格式修复（2026-11-12）
 
@@ -593,4 +575,4 @@ docker compose up -d
 
 本次 Linux 断网临时容器内 96 项测试通过（84.837 秒）；隔离模拟模型网页已实测
 两轮输入、刷新恢复、确认保存及在原工单页按编号查询。正式 Docker 服务已更新并健康，
-现有会话列表可见。真实模型的网页问答质量和使用者亲自操作仍待验收。
+现有会话列表可见。使用者随后完成真实两轮网页对话并保存工单 3，反馈没有报错；容器重建后会话、草稿和工单仍一致。回答质量与来源合理性仍需人工评阅。
