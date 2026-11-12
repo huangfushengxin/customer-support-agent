@@ -1,5 +1,12 @@
 # 企业 FAQ 与工单客服 Agent
 
+**[在线体验（无需安装或密钥）](https://huangfushengxin.github.io/customer-support-agent/)** · [公网演示说明](公网演示说明.md)
+
+在线版为明确标注的前端规则模拟：可体验 FAQ、多轮草稿、确认建单和刷新恢复；
+数据仅存于访客自己的浏览器，不调用真实模型，也不运行 Python 后端。
+下面是完整 Python / LangGraph / SQLite 项目的本地与 Docker 运行说明。
+
+
 
 
 基于 Python、FastAPI、DeepSeek、LangGraph 和 SQLite 的客服 Agent 学习项目。
