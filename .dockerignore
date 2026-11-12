@@ -1,0 +1,10 @@
+# 只发送运行和测试需要的文件，.env、数据库、日志与 .git 不进入构建上下文。
+**
+!pyproject.toml
+!uv.lock
+!eval_cases.json
+!/*.py
+!index.html
+!agent.html
+!knowledge/
+!knowledge/**

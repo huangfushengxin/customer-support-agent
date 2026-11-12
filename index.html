@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>工单管理系统</title>
+    <style>
+        body {
+            max-width: 700px;
+            margin: 40px auto;
+            padding: 0 20px;
+            font-family: sans-serif;
+        }
+
+        textarea {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            margin: 10px 0;
+            padding: 8px 16px;
+            cursor: pointer;
+        }
+
+        pre {
+            padding: 16px;
+            background: #f0f3f6;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+    </style>
+</head>
+<body>
+    <h1>工单管理系统</h1>
+    <p><a href="/agent-page">打开多轮客服 Agent：连续对话、恢复会话与确认建单</a></p>
+<section>
+    <h2>知识库问答</h2>
+    <p>根据当前演示 FAQ 回答，并展示资料来源。</p>
+
+    <label for="qa-question">你的问题：</label>
+    <textarea id="qa-question" rows="3"
+              maxlength="2000"
+              placeholder="例如：软件激活不了，提示授权无效"></textarea>
+
+    <button id="qa-button" onclick="askKnowledge()">
+        查询知识库
+    </button>
+
+    <p id="qa-status"></p>
+    <pre id="qa-answer">等待提问……</pre>
+    <ul id="qa-sources"></ul>
+</section>
+    <h2>创建工单</h2>
+    <label for="description">问题描述：</label>
+    <textarea id="description" rows="4"
+              placeholder="请输入遇到的问题"></textarea>
+    <button id="create-button" onclick="createTicket()">
+        创建工单
+    </button>
+<button id="draft-button" onclick="generateDraft()">
+    AI 整理草稿
+</button>
+
+<p id="draft-message"></p>
+
+<section id="draft-panel" hidden>
+    <h2>AI 工单草稿</h2>
+    <p>草稿尚未保存，请核对并修改内容。</p>
+
+    <p>
+        <label for="draft-title">标题：</label>
+        <input id="draft-title" type="text" maxlength="60">
+    </p>
+
+    <p>
+        <label for="draft-category">类别：</label>
+        <select id="draft-category">
+            <option value="账号问题">账号问题</option>
+            <option value="激活问题">激活问题</option>
+            <option value="订单问题">订单问题</option>
+            <option value="其他问题">其他问题</option>
+        </select>
+    </p>
+
+    <label for="draft-description">整理后的问题描述：</label>
+    <textarea id="draft-description" rows="5"
+              maxlength="2000"></textarea>
+
+    <h3>建议补充的信息</h3>
+    <ul id="draft-missing-info"></ul>
+
+    <p>可以把补充信息加入上方的原始问题描述，再次点击“AI 整理草稿”。</p>
+    <button id="save-draft-button" onclick="saveDraft()">
+    确认保存草稿
+</button>
+</section>
+    <h2>查询工单</h2>
+    <label for="ticket-id">工单编号：</label>
+    <input id="ticket-id" type="number" min="1" step="1">
+    <button onclick="findTicket()">查询</button>
+    <h2>全部工单</h2>
+    <button onclick="listTickets()">查看全部工单</button>
+
+    <h2>修改工单状态</h2>
+    <p>使用上方“查询工单”输入框中的工单编号。</p>
+
+    <label for="new-status">新状态：</label>
+    <select id="new-status">
+    <option value="待处理">待处理</option>
+    <option value="处理中">处理中</option>
+    <option value="已完成">已完成</option>
+    </select>
+
+<button id="update-button" onclick="updateStatus()">
+    修改状态
+</button>
+    <h2>操作结果</h2>
+    <pre id="result">等待操作……</pre>
+
+    <script>
+        const result = document.getElementById("result");
+
+        // 发送请求，检查状态码，再返回响应数据
+        async function request(url, options = {}) {
+            const response = await fetch(url, options);
+            const data = await response.json();
+
+            if (!response.ok) {
+                const detail = data.detail;
+                const message = typeof detail === "string"
+                    ? detail
+                    : JSON.stringify(detail ?? data);
+
+                throw new Error(
+                    `请求失败（${response.status}）：${message}`
+                );
+            }
+
+            return data;
+        }
+
+        // 创建工单
+        async function createTicket() {
+            const description = document
+                .getElementById("description").value.trim();
+
+            if (description === "") {
+                result.textContent = "请输入问题描述";
+                return;
+            }
+
+            const button = document.getElementById("create-button");
+            button.disabled = true;
+            result.textContent = "正在创建……";
+
+            try {
+                const ticket = await request("/tickets", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({description: description})
+                });
+
+                result.textContent =
+                    "创建成功：\n" + JSON.stringify(ticket, null, 2);
+
+                document.getElementById("ticket-id").value = ticket.id;
+            } catch (error) {
+                result.textContent = error.message;
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        // 按编号查询
+        async function findTicket() {
+            const value = document.getElementById("ticket-id").value;
+            const ticketId = Number(value);
+
+            if (!Number.isSafeInteger(ticketId) || ticketId <= 0) {
+                result.textContent = "请输入正整数编号";
+                return;
+            }
+
+            result.textContent = "正在查询……";
+
+            try {
+                const ticket = await request(`/tickets/${ticketId}`);
+                result.textContent = JSON.stringify(ticket, null, 2);
+            } catch (error) {
+                result.textContent = error.message;
+            }
+        }
+        // 查询全部工单
+async function listTickets() {
+    result.textContent = "正在加载……";
+
+    try {
+        const tickets = await request("/tickets");
+
+        if (tickets.length === 0) {
+            result.textContent = "暂无工单";
+        } else {
+            result.textContent =
+                "全部工单：\n" + JSON.stringify(tickets, null, 2);
+        }
+    } catch (error) {
+        result.textContent = error.message;
+    }
+}
+
+
+// 修改工单状态
+async function updateStatus() {
+    const value = document.getElementById("ticket-id").value;
+    const ticketId = Number(value);
+
+    if (!Number.isSafeInteger(ticketId) || ticketId <= 0) {
+        result.textContent = "请在上方输入正整数工单编号";
+        return;
+    }
+
+    const newStatus = document.getElementById("new-status").value;
+    const button = document.getElementById("update-button");
+
+    button.disabled = true;
+    result.textContent = "正在修改……";
+
+    try {
+        const ticket = await request(
+            `/tickets/${ticketId}/status`,
+            {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({status: newStatus})
+            }
+        );
+
+        result.textContent =
+            "状态已更新：\n" + JSON.stringify(ticket, null, 2);
+    } catch (error) {
+        result.textContent = error.message;
+    } finally {
+        button.disabled = false;
+    }
+}
+// 调用后端生成草稿，并填入可编辑的表单
+async function generateDraft() {
+    const description = document
+        .getElementById("description").value.trim();
+
+    const button = document.getElementById("draft-button");
+    const message = document.getElementById("draft-message");
+    const panel = document.getElementById("draft-panel");
+
+    if (description === "") {
+        message.textContent = "请先输入问题描述";
+        return;
+    }
+
+    // 再次生成会替换当前草稿，先让用户确认
+    if (!panel.hidden) {
+        const confirmed = window.confirm(
+            "重新生成会替换当前草稿，包括你手动修改的内容。是否继续？"
+        );
+
+        if (!confirmed) {
+            return;
+        }
+    }
+
+    button.disabled = true;
+    button.textContent = "AI 正在整理……";
+    message.textContent = "正在生成草稿，请稍候。";
+
+    try {
+        const draft = await request("/ticket-drafts", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                description: description
+            })
+        });
+
+        // 把模型返回的数据填入表单
+        document.getElementById("draft-title").value =
+            draft.title;
+
+        document.getElementById("draft-category").value =
+            draft.category;
+
+        document.getElementById("draft-description").value =
+            draft.description;
+
+        // 展示缺失信息，每一项创建一个列表元素
+        const missingList = document
+            .getElementById("draft-missing-info");
+
+        missingList.replaceChildren();
+
+        const items = draft.missing_info.length > 0
+            ? draft.missing_info
+            : ["暂未发现需要补充的信息，请人工核对草稿。"];
+
+        for (const item of items) {
+            const li = document.createElement("li");
+            li.textContent = item;
+            missingList.appendChild(li);
+        }
+
+        panel.hidden = false;
+        message.textContent = "草稿已生成，尚未保存。";
+    } catch (error) {
+        message.textContent = error.message;
+    } finally {
+        button.disabled = false;
+        button.textContent = "AI 整理草稿";
+    }
+}// 保存用户当前核对和修改后的草稿
+async function saveDraft() {
+    const button = document.getElementById("save-draft-button");
+    const generateButton = document.getElementById("draft-button");
+    const panel = document.getElementById("draft-panel");
+    const message = document.getElementById("draft-message");
+
+    if (button.disabled || panel.hidden) {
+        return;
+    }
+
+    if (generateButton.disabled) {
+        message.textContent = "AI 正在整理，请等待生成完成后再保存。";
+        return;
+    }
+
+    // 读取表单当前的值，包括用户手动修改的内容
+    const title = document
+        .getElementById("draft-title").value.trim();
+
+    const category = document
+        .getElementById("draft-category").value;
+
+    const description = document
+        .getElementById("draft-description").value.trim();
+
+    if (title === "" || description === "") {
+        message.textContent = "标题和问题描述不能为空。";
+        return;
+    }
+
+    if (title.length > 60 || description.length > 2000) {
+        message.textContent =
+            "标题最多60个字符，问题描述最多2000个字符。";
+        return;
+    }
+
+    const confirmed = window.confirm(
+        "确认将当前草稿保存为正式工单吗？"
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    const fields = [
+        document.getElementById("draft-title"),
+        document.getElementById("draft-category"),
+        document.getElementById("draft-description")
+    ];
+
+    button.disabled = true;
+    generateButton.disabled = true;
+
+    for (const field of fields) {
+        field.disabled = true;
+    }
+
+    message.textContent = "正在保存工单……";
+
+    try {
+        const ticket = await request("/tickets/from-draft", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                title: title,
+                category: category,
+                description: description
+            })
+        });
+
+        document.getElementById("ticket-id").value = ticket.id;
+
+        result.textContent =
+            "草稿已保存为正式工单：\n" +
+            JSON.stringify(ticket, null, 2);
+
+        // 保存成功后关闭本次草稿区域
+        panel.hidden = true;
+        message.textContent =
+            `保存成功，工单编号：${ticket.id}。`;
+    } catch (error) {
+        message.textContent = error.message;
+    } finally {
+        button.disabled = false;
+        generateButton.disabled = false;
+
+        for (const field of fields) {
+            field.disabled = false;
+        }
+    }
+}
+async function askKnowledge() {
+    const input = document.getElementById("qa-question");
+    const button = document.getElementById("qa-button");
+    const status = document.getElementById("qa-status");
+    const answer = document.getElementById("qa-answer");
+    const sources = document.getElementById("qa-sources");
+
+    if (button.disabled) {
+        return;
+    }
+
+    const question = input.value.trim();
+
+    if (question === "") {
+        status.textContent = "请先输入问题。";
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = "正在查询……";
+    status.textContent = "正在检索资料并整理回答，请稍候。";
+    answer.textContent = "";
+    sources.replaceChildren();
+
+    try {
+        const data = await request("/knowledge/ask", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                question: question
+            })
+        });
+
+        answer.textContent = data.answer;
+
+        const statusLabels = {
+            answered: "已根据资料生成回答，请核对参考来源。",
+            no_match: "未找到匹配资料，可以补充描述或创建工单。",
+            insufficient_evidence: "已有资料不足以回答，可以联系人工支持。"
+        };
+
+        status.textContent =
+            statusLabels[data.status] ?? "处理完成";
+
+        for (const source of data.sources) {
+            const li = document.createElement("li");
+
+            li.textContent =
+                `[${source.id}] ${source.source}`;
+
+            sources.appendChild(li);
+        }
+    } catch (error) {
+        status.textContent = "查询失败";
+        answer.textContent = error.message;
+    } finally {
+        button.disabled = false;
+        button.textContent = "查询知识库";
+    }
+}
+    </script>
+</body>
+</html>

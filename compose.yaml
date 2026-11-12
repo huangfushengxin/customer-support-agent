@@ -1,0 +1,23 @@
+# 固定英文项目名，避免中文目录名影响 Compose 的默认项目名。
+name: agent-learning
+services:
+  web:
+    build: .
+    image: agent-learning:local
+    environment:
+      AGENT_DATA_DIR: /data
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - agent-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  agent-data:
